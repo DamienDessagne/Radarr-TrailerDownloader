@@ -63,7 +63,7 @@ function Get-YoutubeTrailer {
     )
 
     # Search for trailer on Youtube
-    $ytQuery = "$movieTile $movieYear $YoutubeKeywords trailer"
+    $ytQuery = "$movieTitle $movieYear $YoutubeKeywords trailer"
     $ytQuery = [System.Web.HTTPUtility]::UrlEncode($ytQuery)
 
     $ytSearchUrl = "https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=$ytQuery&type=video&videoDuration=short&key=$YoutubeApiKey"
