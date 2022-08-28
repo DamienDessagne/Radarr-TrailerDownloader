@@ -77,7 +77,7 @@ function Get-YoutubeTrailer {
     # Donwload trailer
     LogInFunction "Downloading video ..."
     $trailerFilename = "$moviePath\$movieTitle ($movieYear) Trailer.%(ext)s"
-    & .\youtube-dl.exe -o $trailerFilename $ytVideoId | Out-File -FilePath $LogFileName -Append
+    & .\yt-dlp.exe -o $trailerFilename $ytVideoId | Out-File -FilePath $LogFileName -Append
     LogInFunction "Trailer successfully downloaded and saved to $trailerFilename"
 }
 
