@@ -6,11 +6,17 @@ $LogActivity = $true
 # Use fake environment variables to test the script as if it was called from Radarr
 $TestModeRadarr = $false
 
+# Your TMDB API key, if not provided, language-dependant features won't be activated
+$TmdbApiKEy = "YOUR_API_KEY";
+
 # Youtube API key (see https://developers.google.com/youtube/v3/getting-started)
 $YoutubeApiKey = "YOUR_API_KEY"
 
-# Additionnal keywords to search for trailers on Youtube (ex: "vost fr" for french subbed trailers)
-$YoutubeKeywords = ""
+# Language-dependant parameters to search for trailers on Youtube
+$YoutubeParams = @{
+       fr=[pscustomobject]@{UseOriginalMovieName=$true; SearchKeywords='bande annonce'};
+       default=[pscustomobject]@{UseOriginalMovieName=$false; SearchKeywords='vostfr trailer'}
+   }
 
 
 ############################# IMPORTS #############################
@@ -51,6 +57,24 @@ function LogInFunction {
     }
 }
 
+############################# CURL / JSON #############################
+function fetchJSON {
+    param($url)
+
+    LogInFunction "Issuing web request to $url ..."
+    $req = [System.Net.WebRequest]::Create("$url")
+
+    $req.ContentType = "application/json; charset=utf-8"
+    $req.Accept = "application/json"
+
+    $resp = $req.GetResponse()
+    $reader = new-object System.IO.StreamReader($resp.GetResponseStream())
+    $responseJSON = $reader.ReadToEnd()
+
+    $response = $responseJSON | ConvertFrom-Json
+    return $response
+}
+
 
 ############################# YOUTUBE #############################
 
@@ -59,24 +83,39 @@ function Get-YoutubeTrailer {
     param (
         $movieTitle, 
         $movieYear, 
-        $moviePath
+        $moviePath,
+        $tmdbId
     )
 
+    $trailerFilename = "$moviePath\$movieTitle ($movieYear)-Trailer.%(ext)s"
+
+    # Gather data from TMDB
+    $keywords = $YoutubeParams.default.SearchKeywords;
+    if($TmdbApiKEy -ne 'YOUR_API_KEY' -and $tmdbId -ne '') {
+        $tmdbURL = "https://api.themoviedb.org/3/movie/$($tmdbId)?api_key=$TmdbApiKEy"
+        LogInFunction "Querying TMDB for details of movie #$tmdbId ..."
+        $tmdbInfo = fetchJSON($tmdbURL)
+
+        if($YoutubeParams.ContainsKey($tmdbInfo.original_language)) {
+            $keywords = $YoutubeParams[$tmdbInfo.original_language].SearchKeywords
+            if($YoutubeParams[$tmdbInfo.original_language].UseOriginalMovieName) {
+                $movieTitle = $tmdbInfo.original_title
+                LogInFunction "Using original movie title : $movieTitle"
+            }
+        }
+    }
+
     # Search for trailer on Youtube
-    $ytQuery = "$movieTitle $movieYear $YoutubeKeywords trailer"
+    $ytQuery = "$movieTitle $movieYear $keywords"
     $ytQuery = [System.Web.HTTPUtility]::UrlEncode($ytQuery)
 
     $ytSearchUrl = "https://youtube.googleapis.com/youtube/v3/search?part=snippet&maxResults=1&q=$ytQuery&type=video&videoDuration=short&key=$YoutubeApiKey"
-    LogInFunction "Sending Youtube search request : $ytSearchUrl ..."
-    
-    $ytSearchResultsJSON = curl $ytSearchUrl
-
-    $ytSearchResults = $ytSearchResultsJSON | ConvertFrom-Json
+    LogInFunction "Sending Youtube search request ..."
+    $ytSearchResults =  fetchJSON($ytSearchUrl)
     $ytVideoId = $ytSearchResults.items[0].id.videoId
 
     # Donwload trailer
     LogInFunction "Downloading video ..."
-    $trailerFilename = "$moviePath\$movieTitle ($movieYear)-Trailer.%(ext)s"
     & .\yt-dlp.exe -o $trailerFilename https://www.youtube.com/watch?v=$ytVideoId | Out-File -FilePath $LogFileName -Append
     LogInFunction "Trailer successfully downloaded and saved to $trailerFilename"
 }
@@ -88,9 +127,10 @@ if($TestModeRadarr) {
     Log "Setting TEST MODE environment"
     $Env:radarr_eventtype = "Download"
     $Env:radarr_isupgrade = "False"
-    $Env:radarr_movie_path = "D:\PlexLibrary\Films\Ex Machina (2015)"
-    $Env:radarr_movie_title = "Ex Machina"
-    $Env:radarr_movie_year = "2015"
+    $Env:radarr_movie_path = "D:\PlexLibrary\Films\Bye Bye Morons (2020)"
+    $Env:radarr_movie_title = "Bye Bye Morons"
+    $Env:radarr_movie_year = "2020"
+    $Env:radarr_movie_tmdbid = "651881"
 }
 
 
@@ -111,7 +151,7 @@ if(Test-Path Env:radarr_eventtype) {
     }
     
     if(($Env:radarr_eventtype -eq "Download" -and $Env:radarr_isupgrade -eq "False") -or $Env:radarr_eventtype -eq "Rename") {
-        Get-YoutubeTrailer $Env:radarr_movie_title $Env:radarr_movie_year $Env:radarr_movie_path
+        Get-YoutubeTrailer $Env:radarr_movie_title $Env:radarr_movie_year $Env:radarr_movie_path $Env:radarr_movie_tmdbid
     }
     
     exit 0
@@ -154,7 +194,19 @@ ForEach-Object {
             $title = $Matches.1
             $year = $Matches.2
             
-            Get-YoutubeTrailer $title $year $_.FullName
+            # Get TMDB Id
+            $tmdbId = '';
+            if($TmdbApiKEy -ne 'YOUR_API_KEY') {
+                $tmdbSearchURL = "https://api.themoviedb.org/3/search/movie?api_key=$TmdbApiKEy&query=$([System.Web.HTTPUtility]::UrlEncode($title))&year=$year"
+                Log "Searching for TMDB ID : $tmdbSearchURL"
+                $tmdbSearchResultsJSON = curl $tmdbSearchURL
+                $tmdbSearchResults = $tmdbSearchResultsJSON | ConvertFrom-Json
+                if($tmdbSearchResults.total_results -ge 1) {
+                    $tmdbId = $tmdbSearchResults.results[0].id;
+                }
+            }
+
+            Get-YoutubeTrailer $title $year $_.FullName $tmdbId
             $downloadedTrailersCount++
         }
         else {
