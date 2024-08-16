@@ -15,7 +15,7 @@ $YoutubeApiKey = "YOUR_API_KEY"
 # Language-dependant parameters to search for trailers on Youtube
 $YoutubeParams = @{
        fr=[pscustomobject]@{UseOriginalMovieName=$true; SearchKeywords='bande annonce'};
-       default=[pscustomobject]@{UseOriginalMovieName=$false; SearchKeywords='vostfr trailer'}
+       default=[pscustomobject]@{UseOriginalMovieName=$false; SearchKeywords='vost trailer'}
    }
 
 
@@ -116,7 +116,7 @@ function Get-YoutubeTrailer {
 
     # Donwload trailer
     LogInFunction "Downloading video ..."
-    & .\yt-dlp.exe -o $trailerFilename https://www.youtube.com/watch?v=$ytVideoId | Out-File -FilePath $LogFileName -Append
+    & .\yt-dlp.exe -o $trailerFilename -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b" https://www.youtube.com/watch?v=$ytVideoId | Out-File -FilePath $LogFileName -Append
     LogInFunction "Trailer successfully downloaded and saved to $trailerFilename"
 }
 

@@ -8,6 +8,7 @@ A Windows PowerShell script that downloads movie trailers from Youtube for a Rad
 # Installation
 - Download and extract in a directory of your choice, visible to your Radarr installation.
 - Open `DownloadTrailer.ps1` and fill in your Youtube API key (see https://developers.google.com/youtube/v3/getting-started)
+- Highly recommended: download [ffmpeg](https://www.ffmpeg.org/) and add its `bin` folder to your PATH environment variable
 
 # Adding trailers to your existing library
 In a PowerShell window, launch `.\DownloadTrailer.ps1 PATH_TO_MY_LIBRARY_ROOT_FOLDER` and wait for the script to finish. You can monitor download progress directly inside the most recent log file
