@@ -69,12 +69,12 @@ def fetch_json(url):
 ############################# TMDB #############################
 
 # Searches the TMDB ID based on the title and the year. Returns '' if not found.
-def get_tmbd_id(title, year):
+def get_tmbd_id(title, year, is_movie):
     if TMDB_API_KEY == "YOUR_API_KEY":
         return ''
 
-    tmdb_search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={quote(title)}&year={year}"
-    log(f"Searching for TMDB ID...")
+    tmdb_search_url = f"https://api.themoviedb.org/3/search/{"movie" if is_movie else "tv"}?api_key={TMDB_API_KEY}&query={quote(title)}&year={year}"
+    log(f"Searching for TMDB {"Movie" if is_movie else "TV Show"} ID...")
     tmdb_search_results = fetch_json(tmdb_search_url)
     if tmdb_search_results["total_results"] >= 1:
         log(f"TMDB ID found: {tmdb_search_results["results"][0]["id"]}")
@@ -82,21 +82,23 @@ def get_tmbd_id(title, year):
     return ''
 
 # Returns the JSON info on TMDB for the given movie ID. If no info can be found, None is returned
-def get_tmdb_info(tmdb_id):
+def get_tmdb_info(tmdb_id, is_movie):
     if TMDB_API_KEY == "YOUR_API_KEY" or tmdb_id is None:
         return None
 
-    log(f"Querying TMDB for details of movie #{tmdb_id} ...")
-    return fetch_json(f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}")
+    log(f"Querying TMDB for details of {"Movie" if is_movie else "TV Show"} #{tmdb_id} ...")
+    return fetch_json(f"https://api.themoviedb.org/3/{"movie" if is_movie else "tv"}/{tmdb_id}?api_key={TMDB_API_KEY}")
 
 ############################# YOUTUBE #############################
 
-def get_youtube_trailer(title, year, folder_path, tmdb_id):
-    trailer_filename = os.path.join(folder_path, f"{title} ({year})-Trailer.%(ext)s")
+def get_youtube_trailer(title, year, folder_path, tmdb_id, is_movie):
 
     # Gather data from TMDB
+    if tmdb_id is None:
+        tmdb_id = get_tmbd_id(title, year, is_movie)
+
     keywords = YOUTUBE_PARAMS["default"]["search_keywords"]
-    tmdb_info = get_tmdb_info(tmdb_id)
+    tmdb_info = get_tmdb_info(tmdb_id, is_movie)
     if tmdb_info is not None and tmdb_info["original_language"] in YOUTUBE_PARAMS:
         keywords = YOUTUBE_PARAMS[tmdb_info["original_language"]]["search_keywords"]
         if YOUTUBE_PARAMS[tmdb_info["original_language"]]["use_original_movie_name"]:
@@ -120,7 +122,7 @@ def get_youtube_trailer(title, year, folder_path, tmdb_id):
     # Download trailer using yt-dlp
     log("Downloading video...")
     ydl_opts = {
-        'outtmpl': trailer_filename,
+        'outtmpl': os.path.join(folder_path, f"{title} ({year})-Trailer.%(ext)s"),
         'format': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b',
     }
     try:
@@ -137,35 +139,49 @@ def get_youtube_trailer(title, year, folder_path, tmdb_id):
 
 def download_trailers_for_library(library_root_path):
     downloaded_trailers_count = 0
-    for root, dirs, files in os.walk(library_root_path):
-        for dir_name in dirs:
-            dir_path = os.path.join(root, dir_name)
-            already_has_trailer = False
 
-            for file_name in os.listdir(dir_path):
-                if file_name.lower().endswith("-trailer.mp4") or file_name.lower().endswith("-trailer.mkv"):
-                    already_has_trailer = True
-                    break
+    # Iterate over immediate subfolders of library_root_path
+    for dir_name in os.listdir(library_root_path):
+        dir_path = os.path.join(library_root_path, dir_name)
 
-            if already_has_trailer:
-                log(f'Skipping "{dir_name}" as it already has a trailer')
-            else:
-                log(f'Downloading a trailer for "{dir_name}" ...')
+        if not os.path.isdir(dir_path):
+            continue
 
-                # Extracting movie title and year from the filename
+        # Check if the directory already has a trailer
+        already_has_trailer = False
+        for file_name in os.listdir(dir_path):
+            if file_name.lower().endswith("-trailer.mp4") or file_name.lower().endswith("-trailer.mkv"):
+                already_has_trailer = True
+                break
+
+        if already_has_trailer:
+            log(f'Skipping "{dir_name}" as it already has a trailer')
+        else:
+            log(f'Downloading a trailer for "{dir_name}" ...')
+
+            # Extract title and year from the folder name
+            match = re.match(r"(.*)\((\d{4})\)", dir_name)
+            if match:
+                title, year = match.groups()
+                tmdb_id = None
+                is_movie = False
+
+                # Find the largest file in the directory
                 video_files = [f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
                 if video_files:
+                    is_movie = True
                     video_file = max(video_files, key=lambda f: os.path.getsize(os.path.join(dir_path, f)))
                     video_file_base = os.path.splitext(video_file)[0]
 
+                    # Extract TMDB ID from the filename if available
                     match = re.match(r"(.*) \((\d{4})\)(.*tmdb-(\d+).*|.*)", video_file_base)
                     if match:
-                        title, year, suffix, tmdb_id = match.groups()
-                        if tmdb_id is None:
-                            tmdb_id = get_tmbd_id(title, year)
-                        downloaded_trailers_count += get_youtube_trailer(title, year, dir_path, tmdb_id)
-                    else:
-                        log("Invalid name format, skipping")
+                        tmdb_id = match[4]
+
+                # Download the trailer
+                downloaded_trailers_count += get_youtube_trailer(title, year, dir_path, tmdb_id, is_movie)
+            else:
+                log(f"Invalid name format: {dir_name}, expecting 'title (year)', skipping")
 
     log(f"Successfully downloaded {downloaded_trailers_count} new trailers.")
 
@@ -191,14 +207,36 @@ def main():
                 os.environ["radarr_movie_title"],
                 os.environ["radarr_movie_year"],
                 os.environ["radarr_movie_path"],
-                os.environ["radarr_movie_tmdbid"]
+                os.environ["radarr_movie_tmdbid"],
+                True
+            )
+
+        sys.exit(0)
+
+    # Calling script from Sonarr
+    if "sonarr_eventtype" in os.environ:
+        log("Script triggered from Sonarr")
+
+        if os.environ["sonarr_eventtype"] == "Test":
+            if YOUTUBE_API_KEY == "YOUR_API_KEY":
+                log("Please insert your Youtube API key for the script to work")
+                sys.exit(1)
+            log("Test successful")
+
+        if (os.environ["sonarr_eventtype"] == "Download" and os.environ["sonarr_isupgrade"] == "False") or os.environ["sonarr_eventtype"] == "Rename":
+            get_youtube_trailer(
+                os.environ["sonarr_series_title"],
+                os.environ["sonarr_series_year"],
+                os.environ["sonarr_series_path"],
+                None,
+                False
             )
 
         sys.exit(0)
 
     # Calling script from command line
     if len(sys.argv) == 1:
-        print("Usage: python DownloadTrailer.py movies_library_root_folder")
+        print("Usage: python DownloadTrailer.py library_root_folder")
         sys.exit(0)
 
     if not os.path.exists(sys.argv[1]):
