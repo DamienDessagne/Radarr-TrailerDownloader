@@ -160,7 +160,7 @@ def download_trailers_for_library(library_root_path):
             log(f'Downloading a trailer for "{dir_name}" ...')
 
             # Extract title and year from the folder name
-            match = re.match(r"(.*)\((\d{4})\)", dir_name)
+            match = re.match(r"(.*)\s\((\d{4})\)", dir_name)
             if match:
                 title, year = match.groups()
                 tmdb_id = None
@@ -174,7 +174,7 @@ def download_trailers_for_library(library_root_path):
                     video_file_base = os.path.splitext(video_file)[0]
 
                     # Extract TMDB ID from the filename if available
-                    match = re.match(r"(.*) \((\d{4})\)(.*tmdb-(\d+).*|.*)", video_file_base)
+                    match = re.match(r"(.*)\s\((\d{4})\)(.*tmdb-(\d+).*|.*)", video_file_base)
                     if match:
                         tmdb_id = match[4]
 
