@@ -22,6 +22,9 @@ TMDB_API_KEY = config.get('CONFIG', 'TMDB_API_KEY')
 # Youtube API key (see https://developers.google.com/youtube/v3/getting-started)
 YOUTUBE_API_KEY = config.get('CONFIG', 'YOUTUBE_API_KEY')
 
+# Browser name to get cookies from to download from YouTube. See https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp for details
+YT_DLP_COOKIES_BROWSER = config.get('CONFIG', 'yt_dlp_cookies_browser')
+
 # Language-dependant parameters to search for trailers on Youtube
 YOUTUBE_PARAMS = {"default": {
     "use_original_movie_name": config.getboolean('YOUTUBE_PARAMS.default', 'use_original_movie_name'),
@@ -125,6 +128,8 @@ def get_youtube_trailer(title, year, folder_path, tmdb_id, is_movie):
         'outtmpl': os.path.join(folder_path, f"{title} ({year})-Trailer.%(ext)s"),
         'format': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b',
     }
+    if YT_DLP_COOKIES_BROWSER != '':
+        ydl_opts["cookiesfrombrowser"] = (YT_DLP_COOKIES_BROWSER, None, None, None)
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(f"https://www.youtube.com/watch?v={yt_video_id}", download=True)
