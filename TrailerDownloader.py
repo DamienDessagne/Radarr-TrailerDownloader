@@ -54,7 +54,7 @@ LOG_FILE_PATH = os.path.join(LOG_FOLDER_NAME, LOG_FILE_NAME)
 def log(log_text):
     print(log_text)
     if LOG_ACTIVITY:
-        with open(LOG_FILE_PATH, "a") as log_file:
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as log_file:
             log_file.write(log_text + "\n")
 
 ############################# JSON #############################
