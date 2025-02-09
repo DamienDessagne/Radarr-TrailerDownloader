@@ -71,7 +71,7 @@ def fetch_json(url):
 # Searches the TMDB ID based on the title and the year. Returns '' if not found.
 def get_tmbd_id(title, year, is_movie):
     if TMDB_API_KEY == "YOUR_API_KEY":
-        return ''
+        return None
 
     tmdb_search_url = f"https://api.themoviedb.org/3/search/{"movie" if is_movie else "tv"}?api_key={TMDB_API_KEY}&query={quote(title)}&year={year}"
     log(f"Searching for TMDB {"Movie" if is_movie else "TV Show"} ID...")
@@ -79,7 +79,7 @@ def get_tmbd_id(title, year, is_movie):
     if tmdb_search_results["total_results"] >= 1:
         log(f"TMDB ID found: {tmdb_search_results["results"][0]["id"]}")
         return tmdb_search_results["results"][0]["id"]
-    return ''
+    return None
 
 # Returns the JSON info on TMDB for the given movie ID. If no info can be found, None is returned
 def get_tmdb_info(tmdb_id, is_movie):
