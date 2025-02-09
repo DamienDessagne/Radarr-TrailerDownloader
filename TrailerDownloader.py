@@ -102,7 +102,7 @@ def get_youtube_trailer(title, year, folder_path, tmdb_id, is_movie):
     if tmdb_info is not None and tmdb_info["original_language"] in YOUTUBE_PARAMS:
         keywords = YOUTUBE_PARAMS[tmdb_info["original_language"]]["search_keywords"]
         if YOUTUBE_PARAMS[tmdb_info["original_language"]]["use_original_movie_name"]:
-            title = tmdb_info["original_title"]
+            title = tmdb_info[f"{"original_title" if is_movie else "original_name"}"]
             log(f"Using original title: {title}")
 
     # Search for trailer on YouTube
@@ -236,7 +236,7 @@ def main():
 
     # Calling script from command line
     if len(sys.argv) == 1:
-        print("Usage: python DownloadTrailer.py library_root_folder")
+        print("Usage: py DownloadTrailer.py library_root_folder")
         sys.exit(0)
 
     if not os.path.exists(sys.argv[1]):
